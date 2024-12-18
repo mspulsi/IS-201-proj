@@ -1,0 +1,25 @@
+.bgblockbaby {
+    background-color: rgba(190, 212, 241, 0.723);
+    display: inline-block;
+    padding-top: 20px;
+    height: auto;
+    width: 50%;
+    position: static;
+}
+
+.underlineblock {
+    display: inline-block;
+    width: auto;
+    border-bottom: solid black 8px;
+    padding-bottom: 10px;
+}
+
+a {
+    color: white;
+    text-align: center;
+}
+
+.typewriter {
+    font-family: 'Courier New', Courier, monospace;
+    color: grey;
+}

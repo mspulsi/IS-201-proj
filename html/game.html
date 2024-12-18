@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="" />
+    <meta name="author" content="" />
+    <title>Matthew Pulsipher - Maze Game</title>
+    <!-- Favicon-->
+    <link rel="icon" type="image/x-icon" href="../assets/favicon.ico" />
+    <!-- Core theme CSS (includes Bootstrap)-->
+    <link href="../css/styles.css" rel="stylesheet" />
+    <link href="../css/myStyles.css" rel="stylesheet" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background-color: #f0f0f0;
+      overflow: hidden;
+      flex-direction: column;
+      overflow-y: auto;
+      text-align: center;
+    }
+
+    h1 {
+      margin: 0;
+      width: 100%;
+      text-align: center;
+    }
+
+    #level, #time {
+      font-size: 24px;
+      color: #333;
+      margin-top: 10px;
+    }
+
+    #game-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      padding: 10px;
+    }
+
+    #gameCanvas {
+      border: 2px solid #000;
+      background-color: #fff;
+    }
+
+    #gameOver {
+      display: none;
+      color: red;
+      font-size: 36px;
+      font-weight: bold;
+      margin-top: 20px;
+    }
+
+    #restartBtn {
+      display: none;
+      padding: 10px 20px;
+      font-size: 18px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+
+    #restartBtn:hover {
+      background-color: #45a049;
+    }
+  </style>
+</head>
+<body>
+    <!-- Responsive navbar-->
+    <nav id="top" class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container text-center">
+            <a class="navbar-brand" href="../index.html">Matthew Pulsipher</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button>
+            <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+                    <li class="nav-item"><a class="nav-link" aria-current="page" href="../index.html">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="about.html">About/Scratch</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="#">Game</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+  <h1>Random Maze Runner Game</h1>
+  <div id="level"></div>
+  <div id="time"></div>
+  <div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+  </div>
+  <div id="gameOver">Game Over!</div>
+  <button id="restartBtn" onclick="restartGame()">Restart</button>
+
+  <script>
+    // Game setup
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    let level = 1; // Current level
+    let rowCount = 10; // Number of rows (starts with 10)
+    let colCount = 10; // Number of columns (starts with 10)
+    let gridSize = 40; // Grid size
+    const wallThickness = 4; // Wall thickness
+    let maze = [];
+    let timer;
+    let timeLimit = 15; // Time limit per level in seconds
+    let timeRemaining = timeLimit;
+
+    // Player state
+    const player = {
+      x: 1,
+      y: 1,
+      color: 'red',
+      size: gridSize - wallThickness
+    };
+
+    // Goal state
+    const goal = {
+      x: colCount - 2,
+      y: rowCount - 2,
+      color: 'green',
+      size: gridSize - wallThickness
+    };
+
+    // Directions: Up, Right, Down, Left
+    const directions = [
+      [-1, 0], // Up
+      [0, 1],  // Right
+      [1, 0],  // Down
+      [0, -1]  // Left
+    ];
+
+    // Helper function to shuffle directions (used in backtracking)
+    function shuffleDirections() {
+      for (let i = directions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [directions[i], directions[j]] = [directions[j], directions[i]];
+      }
+    }
+
+    // Maze generation using Recursive Backtracking
+    function generateMaze(x, y) {
+      maze[y][x] = 0; // Mark the current cell as part of the path
+
+      shuffleDirections();
+
+      // Visit neighbors
+      for (let [dx, dy] of directions) {
+        const nx = x + dx * 2;
+        const ny = y + dy * 2;
+
+        if (nx >= 0 && nx < colCount && ny >= 0 && ny < rowCount && maze[ny][nx] === 1) {
+          maze[y + dy][x + dx] = 0; // Make a gap between walls
+          generateMaze(nx, ny); // Recursively visit the neighbor
+        }
+      }
+    }
+
+    // Add random openings in walls to create more paths (difficulty increases as level goes up)
+    function addRandomOpenings() {
+      const openingChance = Math.max(0.2 - (level - 1) * 0.05, 0.05); // Decrease opening chance as level increases
+      for (let row = 0; row < rowCount; row++) {
+        for (let col = 0; col < colCount; col++) {
+          if (maze[row][col] === 1 && Math.random() < openingChance) {
+            maze[row][col] = 0;
+          }
+        }
+      }
+    }
+
+    // Initialize maze generation from a random starting point
+    function initMaze() {
+      maze = Array.from({ length: rowCount }, () => Array(colCount).fill(1)); // Reset maze array
+
+      const startX = 1;
+      const startY = 1;
+      generateMaze(startX, startY);
+      maze[startY][startX] = 0; // Make sure the start point is clear
+
+      // Randomize the goal's position and ensure it's reachable
+      placeGoal();
+      addRandomOpenings(); // Add random openings in the maze to increase complexity
+    }
+
+    // Resize canvas based on grid size, columns, and rows
+    function resizeCanvas() {
+      canvas.width = (gridSize * colCount) + wallThickness;
+      canvas.height = (gridSize * rowCount) + wallThickness;
+    }
+
+    // BFS to check if goal is reachable from start position
+    function isReachable(startX, startY, goalX, goalY) {
+      const visited = Array.from({ length: rowCount }, () => Array(colCount).fill(false));
+      const queue = [[startX, startY]];
+      visited[startY][startX] = true;
+
+      while (queue.length > 0) {
+        const [x, y] = queue.shift();
+        if (x === goalX && y === goalY) return true;
+
+        for (let [dx, dy] of directions) {
+          const nx = x + dx;
+          const ny = y + dy;
+
+          if (nx >= 0 && ny >= 0 && nx < colCount && ny < rowCount && !visited[ny][nx] && maze[ny][nx] === 0) {
+            visited[ny][nx] = true;
+            queue.push([nx, ny]);
+          }
+        }
+      }
+
+      return false;
+    }
+
+    // Place the goal in an open and reachable position
+    function placeGoal() {
+      let goalPlaced = false;
+
+      while (!goalPlaced) {
+        const newGoalX = Math.floor(Math.random() * (colCount - 2)) + 1;
+        const newGoalY = Math.floor(Math.random() * (rowCount - 2)) + 1;
+
+        // Ensure the goal is on an open space
+        if (maze[newGoalY][newGoalX] === 0) {
+          // Check if the goal is reachable from the start position (1, 1)
+          if (isReachable(player.x, player.y, newGoalX, newGoalY)) {
+            goal.x = newGoalX;
+            goal.y = newGoalY;
+            goalPlaced = true;
+          }
+        }
+      }
+    }
+
+    // Draw the maze
+    function drawMaze() {
+      for (let row = 0; row < rowCount; row++) {
+        for (let col = 0; col < colCount; col++) {
+          if (maze[row][col] === 1) {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(col * gridSize + wallThickness, row * gridSize + wallThickness, gridSize - wallThickness, gridSize - wallThickness);
+          } else {
+            ctx.fillStyle = 'white';
+            ctx.fillRect(col * gridSize + wallThickness, row * gridSize + wallThickness, gridSize - wallThickness, gridSize - wallThickness);
+          }
+          ctx.strokeRect(col * gridSize + wallThickness, row * gridSize + wallThickness, gridSize - wallThickness, gridSize - wallThickness);
+        }
+      }
+    }
+
+    // Draw the player
+    function drawPlayer() {
+      ctx.fillStyle = player.color;
+      ctx.fillRect(player.x * gridSize + wallThickness, player.y * gridSize + wallThickness, player.size, player.size);
+    }
+
+    // Draw the goal
+    function drawGoal() {
+      ctx.fillStyle = goal.color;
+      ctx.fillRect(goal.x * gridSize + wallThickness, goal.y * gridSize + wallThickness, goal.size, goal.size);
+    }
+
+    // Handle player movement
+    function movePlayer(dx, dy) {
+      const newX = player.x + dx;
+      const newY = player.y + dy;
+
+      // Prevent moving outside the maze's boundaries
+      if (newX >= 0 && newX < colCount && newY >= 0 && newY < rowCount && maze[newY][newX] !== 1) {
+        player.x = newX;
+        player.y = newY;
+      }
+    }
+
+    // Listen for keypresses to move the player
+    window.addEventListener('keydown', (e) => {
+      if (timer === null) return; // Don't allow movement if game over
+      switch (e.key) {
+        case 'ArrowUp':
+          movePlayer(0, -1);
+          break;
+        case 'ArrowDown':
+          movePlayer(0, 1);
+          break;
+        case 'ArrowLeft':
+          movePlayer(-1, 0);
+          break;
+        case 'ArrowRight':
+          movePlayer(1, 0);
+          break;
+      }
+      drawGame();
+    });
+
+    // Check if the player has reached the goal
+    function checkGoal() {
+      if (player.x === goal.x && player.y === goal.y) {
+        clearInterval(timer); // Stop the timer
+        nextLevel(); // Automatically move to the next level
+      }
+    }
+
+    // Timer countdown
+    function startTimer() {
+      // Clear any existing timer before starting a new one
+      if (timer !== null) {
+        clearInterval(timer);
+      }
+
+      timer = setInterval(() => {
+        if (timeRemaining <= 0) {
+          clearInterval(timer); // Stop the timer
+          endGame(); // End game when time is up
+        } else {
+          timeRemaining--;
+          document.getElementById('time').textContent = `Time: ${timeRemaining}s`;
+        }
+      }, 1000);
+    }
+
+    // End the game
+    function endGame() {
+      document.getElementById('gameOver').style.display = 'block';
+      document.getElementById('restartBtn').style.display = 'block';
+      timer = null; // Disable further movement
+    }
+
+    // Proceed to the next level
+    function nextLevel() {
+      level++; // Increment level
+      rowCount = Math.min(20, 10 + level); // Increase rows/columns per level
+      colCount = Math.min(20, 10 + level);
+      gridSize = Math.max(30, 40 - level); // Reduce grid size for higher levels
+
+      resizeCanvas(); // Update canvas size
+      player.x = 1; // Reset player position
+      player.y = 1;
+
+      timeRemaining = timeLimit; // Reset the timer
+      initMaze(); // Generate new maze for the next level
+      drawGame(); // Redraw the game
+      startTimer(); // Start the timer for the new level
+    }
+
+    // Restart the game
+    function restartGame() {
+      // Clear the previous timer and reset game state
+      clearInterval(timer);
+      timer = null;
+
+      level = 1;
+      timeRemaining = timeLimit;
+      document.getElementById('gameOver').style.display = 'none';
+      document.getElementById('restartBtn').style.display = 'none';
+      resizeCanvas();
+      startGame(); // Restart the game from level 1
+    }
+
+    // Draw the entire game (maze + player + goal)
+    function drawGame() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
+      drawMaze();
+      drawPlayer();
+      drawGoal();
+      checkGoal(); // Check if the player has reached the goal
+      document.getElementById('level').textContent = `Level: ${level}`; // Display current level
+    }
+
+    // Start the game
+    function startGame() {
+      initMaze();
+      resizeCanvas(); // Ensure the canvas is sized correctly
+      drawGame();
+      startTimer(); // Start the countdown timer
+    }
+
+    startGame(); // Initial draw
+  </script>
+</body>
+</html>
